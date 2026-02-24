@@ -1,0 +1,4 @@
+$host = 'db5018695033.hosting-data.io';
+$dbname = 'dbs14801731';
+$username = 'dbu56411';
+$password = '|0^m6U(4SC9Y5jrz?<af';
