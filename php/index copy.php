@@ -159,24 +159,6 @@ session_start();
             <div class="list-group-item d-flex gap-3 py-3 bg-body-tertiary">
                 <div class="d-flex gap-2 w-100 justify-content-between">
                     <div>
-                        <h6 class="mb-0 fw-bold text-primary">v1.3.0 - Ergonomie & Temps réel</h6>
-                        <p class="mb-0 opacity-75 mt-2">Refonte visuelle et sauvegarde automatique.</p>
-                        <ul class="mt-2 mb-1 small text-muted ps-3">
-                            <li><strong>Auto-save :</strong> Sauvegarde automatique des tâches sans recharger la page.</li>
-                            <li><strong>Design :</strong> Nouveaux menus déroulants style "pilule" avec emojis de couleur.</li>
-                            <li><strong>Interface :</strong> Affichage des membres sous forme d'avatars personnalisés (Chips).</li>
-                            <li><strong>Notifications :</strong> Nouvelles alertes de sauvegarde flottantes (glassmorphism).</li>
-                            <li><strong>Navigation :</strong> Refonte complète de la barre de menu et intégration du changement de mot de passe.</li>
-                            <li><strong>Authentification :</strong> Pages de connexion et d'inscription modernisées et recentrées.</li>
-                        </ul>
-                    </div>
-                    <small class="opacity-50 text-nowrap changelog-date">26 Fév. 2026</small>
-                </div>
-            </div>
-
-            <div class="list-group-item d-flex gap-3 py-3">
-                <div class="d-flex gap-2 w-100 justify-content-between">
-                    <div>
                         <h6 class="mb-0 fw-bold">v1.2.0 - Module de Collaboration</h6>
                         <p class="mb-0 opacity-75 mt-2">Mise en place du travail d'équipe.</p>
                         <ul class="mt-2 mb-1 small text-muted ps-3">

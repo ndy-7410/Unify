@@ -32,6 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_project'])) {
     $name = trim($_POST['name'] ?? '');
     $description = trim($_POST['description'] ?? '');
 
+    // Sécurité : On vérifie que c'est bien le PROPRIÉTAIRE (user_id) qui modifie
     if ($name !== '' && $project_id !== '') {
         $stmt = $pdo->prepare("UPDATE project
                                SET name = ?, description = ?, updated_at = NOW()
@@ -48,6 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_project'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_project'])) {
     $project_id = $_POST['project_id'] ?? '';
     if ($project_id !== '') {
+        // Sécurité : Seul le propriétaire peut supprimer
         $stmt = $pdo->prepare("DELETE FROM project WHERE project_id = ? AND user_id = ?");
         $stmt->execute([$project_id, $user_id]);
         header("Location: project.php");
@@ -55,11 +57,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_project'])) {
     }
 }
 
-// Récupération des projets
-$stmt = $pdo->prepare("SELECT project_id, name, description, created_at, updated_at
-                       FROM project WHERE user_id = ? ORDER BY created_at DESC");
-$stmt->execute([$user_id]);
-$project = $stmt->fetchAll();
+// --- RECUPERATION DES PROJETS ---
+$sql = "SELECT DISTINCT p.project_id, p.name, p.description, p.created_at, p.updated_at, p.user_id as owner_id, u.name as owner_name
+        FROM project p
+        LEFT JOIN project_user pu ON p.project_id = pu.project_id
+        JOIN user u ON p.user_id = u.user_id 
+        WHERE p.user_id = :user_id OR pu.user_id = :user_id
+        ORDER BY p.created_at DESC";
+
+$stmt = $pdo->prepare($sql);
+$stmt->execute(['user_id' => $user_id]);
+$projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
 <!DOCTYPE html>
@@ -67,98 +75,150 @@ $project = $stmt->fetchAll();
 
 <head>
     <meta charset="UTF-8" />
-    <title>Unify | Projet</title>
+    <title>Unify | Mes Projets</title>
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+    <style>
+        /* Design des cartes harmonisé avec price.php */
+        .card-project {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            background-color: #fff;
+            border: 1px solid rgba(0,0,0,.08);
+        }
+        .card-project:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 .5rem 1rem rgba(0,0,0,.1)!important;
+        }
+    </style>
 </head>
 
-<body>
+<body class="bg-white d-flex flex-column min-vh-100">
 
     <?php include 'navbar.php'; ?>
 
-    <section class="py-5 text-center container">
-        <div class="row py-lg-5">
+    <section class="py-5 text-center container mb-4">
+        <div class="row py-lg-3">
             <div class="col-lg-6 col-md-8 mx-auto">
-                <div class="text-center mb-4">
-                    <h1>Mes projets</h1>
-                    <p class="text-muted">Accédez à vos projets</p>
-                </div>
-                <button class="btn btn-dark my-2" id="showFormBtn">Ajouter un projet</button>
+                <h1 class="fw-bold mb-3">Mes Projets</h1>
+                <p class="text-muted mb-4">Gérez vos espaces de travail et collaborez avec votre équipe.</p>
+                <button class="btn btn-dark px-4 py-2" id="showFormBtn">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-plus-lg me-2" viewBox="0 0 16 16">
+                        <path fill-rule="evenodd" d="M8 2a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 2"/>
+                    </svg>
+                    Nouveau projet
+                </button>
             </div>
         </div>
     </section>
 
-    <div class="album py-5 bg-body-tertiary">
+    <div class="album pb-5 bg-white flex-grow-1">
         <div class="container">
-            <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 g-3">
+            
+            <?php if (empty($projects)): ?>
+                <div class="text-center py-5">
+                    <div class="mb-4 text-muted" style="opacity: 0.15;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" fill="currentColor" class="bi bi-folder-plus" viewBox="0 0 16 16">
+                            <path d="m.5 3 .04.87a2 2 0 0 0-.342 1.311l.637 7A2 2 0 0 0 2.826 14H9v-1H2.826a1 1 0 0 1-.995-.91l-.637-7A1 1 0 0 1 2.19 4h11.62a1 1 0 0 1 .996 1.09L14.54 8h1.005l.256-2.819A2 2 0 0 0 13.81 3H9.828a2 2 0 0 1-1.414-.586l-.828-.828A2 2 0 0 0 6.172 1H2.5a2 2 0 0 0-2 2m5.672-1a1 1 0 0 1 .707.293L7.586 3H2.19c-.24 0-.47.042-.683.12L1.5 2.98a1 1 0 0 1 1-1z"/>
+                            <path d="M13.5 9a.5.5 0 0 1 .5.5V11h1.5a.5.5 0 0 1 0 1H14v1.5a.5.5 0 0 1-1 0V12h-1.5a.5.5 0 0 1 0-1H13V9.5a.5.5 0 0 1 .5-.5"/>
+                        </svg>
+                    </div>
+                    <h4 class="text-muted fw-normal">Aucun projet pour le moment</h4>
+                    <p class="text-secondary small">Commencez par créer votre premier espace de travail.</p>
+                </div>
+            <?php else: ?>
+                
+                <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+                    <?php foreach ($projects as $p): 
+                        $is_owner = ($p['owner_id'] == $user_id);
+                    ?>
+                        <div class="col">
+                            <div class="card card-project h-100 shadow-sm rounded-4 border-0">
+                                <div class="card-body d-flex flex-column p-4">
 
-                <?php foreach ($project as $p): ?>
-                    <div class="col">
-                        <div class="card shadow-sm">
-                            <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-start mb-3">
+                                        <h5 class="card-title fw-bold text-truncate mb-0" style="max-width: 70%;" title="<?= htmlspecialchars($p['name']) ?>">
+                                            <?= htmlspecialchars($p['name']) ?>
+                                        </h5>
+                                        <?php if($is_owner): ?>
+                                            <span class="badge bg-dark text-white rounded-pill px-3">Propriétaire</span>
+                                        <?php else: ?>
+                                            <span class="badge bg-light text-dark border rounded-pill px-3">Partagé</span>
+                                        <?php endif; ?>
+                                    </div>
+                                    
+                                    <p class="card-text text-muted small flex-grow-1">
+                                        <?= !empty($p['description']) ? htmlspecialchars($p['description']) : '<em>Aucune description</em>' ?>
+                                    </p>
 
-                                <p class="card-text"><?= htmlspecialchars($p['name']) ?></p>
-                                <p class="card-text small"><?= htmlspecialchars($p['description']) ?></p>
+                                    <div class="mt-4 pt-3 border-top">
+                                        <div class="d-flex justify-content-between align-items-center mb-3">
+                                            <small class="text-secondary d-flex align-items-center">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" class="bi bi-person-circle me-1" viewBox="0 0 16 16">
+                                                    <path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0"/>
+                                                    <path fill-rule="evenodd" d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8m8-7a7 7 0 0 0-5.468 11.37C3.242 11.226 4.805 10 8 10s4.757 1.225 5.468 2.37A7 7 0 0 0 8 1"/>
+                                                </svg>
+                                                <?= htmlspecialchars($p['owner_name']) ?>
+                                            </small>
+                                            <small class="text-muted" style="font-size: 0.75rem;">
+                                                <?= date("d/m/Y", strtotime($p['created_at'])) ?>
+                                            </small>
+                                        </div>
 
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div class="btn-group">
+                                        <div class="d-grid gap-2 d-flex">
+                                            <a href="task.php?project_id=<?= $p['project_id'] ?>" class="btn btn-dark btn-sm flex-grow-1">
+                                                Accéder
+                                            </a>
 
-                                        <a href="task.php?project_id=<?= $p['project_id'] ?>"
-                                            class="btn btn-sm btn-outline-secondary">Voir les tâches</a>
-
-                                        <button class="btn btn-sm btn-outline-secondary editBtn"
-                                            data-id="<?= $p['project_id'] ?>"
-                                            data-name="<?= htmlspecialchars($p['name'], ENT_QUOTES) ?>"
-                                            data-description="<?= htmlspecialchars($p['description'], ENT_QUOTES) ?>">
-                                            Modifier
-                                        </button>
-
+                                            <?php if($is_owner): ?>
+                                                <button class="btn btn-outline-secondary btn-sm editBtn"
+                                                    data-id="<?= $p['project_id'] ?>"
+                                                    data-name="<?= htmlspecialchars($p['name'], ENT_QUOTES) ?>"
+                                                    data-description="<?= htmlspecialchars($p['description'], ENT_QUOTES) ?>"
+                                                    title="Paramètres">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-gear-fill" viewBox="0 0 16 16">
+                                                        <path d="M9.405 1.05c-.413-1.4-2.397-1.4-2.81 0l-.1.34a1.464 1.464 0 0 1-2.105.872l-.31-.17c-1.283-.698-2.686.705-1.987 1.987l.169.311c.446.82.023 1.841-.872 2.105l-.34.1c-1.4.413-1.4 2.397 0 2.81l.34.1a1.464 1.464 0 0 1 .872 2.105l-.17.31c-.698 1.283.705 2.686 1.987 1.987l.311-.169a1.464 1.464 0 0 1 2.105.872l.1.34c.413 1.4 2.397 1.4 2.81 0l.1-.34a1.464 1.464 0 0 1 2.105-.872l.31.17c1.283.698 2.686-.705 1.987-1.987l-.169-.311a1.464 1.464 0 0 1 .872-2.105l.34-.1c1.4-.413 1.4-2.397 0-2.81l-.34-.1a1.464 1.464 0 0 1-.872-2.105l.17-.31c.698-1.283-.705-2.686-1.987-1.987l-.311.169a1.464 1.464 0 0 1-2.105-.872zM8 10.93a2.929 2.929 0 1 1 0-5.86 2.929 2.929 0 0 1 0 5.86"/>
+                                                    </svg>
+                                                </button>
+                                            <?php endif; ?>
+                                        </div>
                                     </div>
 
-                                    <!-- ICI modification demandée : -->
-                                    <small class="text-body-secondary">
-                                        Créé le : <?= date("d/m/Y", strtotime($p['created_at'])) ?>
-                                        <!-- | Modifié le : <?= date("d/m/Y", strtotime($p['updated_at'])) ?> -->
-                                    </small>
                                 </div>
-
                             </div>
                         </div>
-                    </div>
-                <?php endforeach; ?>
-            </div>
+                    <?php endforeach; ?>
+                </div>
+
+            <?php endif; ?>
         </div>
     </div>
 
 
-    <!-- MODAL CREATION -->
     <div class="modal fade" id="createProjectModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
+            <div class="modal-content border-0 shadow">
 
-                <div class="modal-header">
-                    <h5 class="modal-title">Créer un projet</h5>
+                <div class="modal-header border-bottom-0">
+                    <h5 class="modal-title fw-bold">Nouveau projet</h5>
                     <button class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
 
                 <form method="POST">
                     <div class="modal-body">
+                        <label class="form-label fw-semibold">Nom du projet</label>
+                        <input type="text" name="name" class="form-control mb-3" placeholder="Ex: Refonte Site Web" required>
 
-                        <label class="form-label">Nom du projet</label>
-                        <input type="text" name="name" class="form-control mb-3" required>
-
-                        <label class="form-label">Description</label>
-                        <textarea name="description" class="form-control" rows="3"></textarea>
+                        <label class="form-label fw-semibold">Description (Optionnel)</label>
+                        <textarea name="description" class="form-control" rows="3" placeholder="Court résumé de l'objectif..."></textarea>
 
                         <?php if (!empty($error)): ?>
-                            <div class="alert alert-danger mt-3"><?= htmlspecialchars($error) ?></div>
+                            <div class="alert alert-danger mt-3 py-2 small"><?= htmlspecialchars($error) ?></div>
                         <?php endif; ?>
-
                     </div>
-                    <div class="modal-footer">
-                        <button class="btn btn-danger" data-bs-dismiss="modal">Annuler</button>
-                        <button type="submit" name="create_project" class="btn btn-success">Créer</button>
+                    <div class="modal-footer border-top-0">
+                        <button type="button" class="btn btn-link text-secondary text-decoration-none" data-bs-dismiss="modal">Annuler</button>
+                        <button type="submit" name="create_project" class="btn btn-dark">Créer le projet</button>
                     </div>
                 </form>
 
@@ -167,13 +227,12 @@ $project = $stmt->fetchAll();
     </div>
 
 
-    <!-- MODAL MODIFICATION -->
     <div class="modal fade" id="editProjectModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
+            <div class="modal-content border-0 shadow">
 
-                <div class="modal-header">
-                    <h5 class="modal-title">Modifier le projet</h5>
+                <div class="modal-header border-bottom-0">
+                    <h5 class="modal-title fw-bold">Paramètres du projet</h5>
                     <button class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
 
@@ -181,22 +240,22 @@ $project = $stmt->fetchAll();
                     <div class="modal-body">
                         <input type="hidden" name="project_id" id="edit_project_id">
 
-                        <label class="form-label">Nom du projet</label>
+                        <label class="form-label fw-semibold">Nom du projet</label>
                         <input type="text" name="name" id="edit_name" class="form-control mb-3" required>
 
-                        <label class="form-label">Description</label>
+                        <label class="form-label fw-semibold">Description</label>
                         <textarea name="description" id="edit_description" class="form-control" rows="3"></textarea>
 
                         <?php if (!empty($update_error)): ?>
-                            <div class="alert alert-danger mt-3"><?= htmlspecialchars($update_error) ?></div>
+                            <div class="alert alert-danger mt-3 py-2 small"><?= htmlspecialchars($update_error) ?></div>
                         <?php endif; ?>
                     </div>
-                    <div class="modal-footer">
-                        <button type="submit" name="delete_project" class="btn btn-danger"
-                            onclick="return confirm('Voulez-vous supprimer ce projet ?')">
-                            Supprimer
+                    <div class="modal-footer border-top-0 d-flex justify-content-between">
+                        <button type="submit" name="delete_project" class="btn btn-outline-danger btn-sm"
+                            onclick="return confirm('Attention : Cette action est irréversible. Tout le contenu du projet sera supprimé. Continuer ?')">
+                            Supprimer le projet
                         </button>
-                        <button type="submit" name="update_project" class="btn btn-success">Enregistrer</button>
+                        <button type="submit" name="update_project" class="btn btn-dark">Enregistrer</button>
                     </div>
                 </form>
 
@@ -204,6 +263,9 @@ $project = $stmt->fetchAll();
         </div>
     </div>
 
+    <div>
+        <?php include 'footer.php'; ?>
+    </div>
 
     <script>
         // OUVERTURE MODAL AJOUT
@@ -221,11 +283,6 @@ $project = $stmt->fetchAll();
             });
         });
     </script>
-    <div>
-        <?php
-        include 'footer.php';
-        ?>
-    </div>
 </body>
 
 </html>

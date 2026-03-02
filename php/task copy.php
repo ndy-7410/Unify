@@ -76,9 +76,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_update'])) {
 }
 
 // --- TRAITEMENT CLASSIQUE ---
-$member_error = '';
-$member_success = '';
-
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Création Tâche
@@ -117,17 +114,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmtCheck = $pdo->prepare("SELECT * FROM project_user WHERE project_id=? AND user_id=?");
             $stmtCheck->execute([$project_id, $targetUserId]);
             
-            if ($targetUserId == $project['owner_id']) {
-                $member_error = "Déjà propriétaire.";
-            } elseif ($stmtCheck->fetch()) {
-                $member_error = "Déjà membre.";
+            if ($targetUserId == $project['owner_id'] || $stmtCheck->fetch()) {
+                // Déjà membre
             } else {
                 $stmtInvite = $pdo->prepare("INSERT INTO project_user (project_id, user_id, role) VALUES (?, ?, 'editor')");
                 $stmtInvite->execute([$project_id, $targetUserId]);
-                $member_success = "Membre ajouté !";
             }
-        } else {
-            $member_error = "Utilisateur introuvable.";
         }
     }
 
@@ -209,6 +201,9 @@ $members = $stmtMembers->fetchAll(PDO::FETCH_ASSOC);
             border: none; display: flex; align-items: center; justify-content: center; transition: transform 0.2s;
         }
         .btn-add-member:hover { transform: scale(1.1); }
+
+        /* Toast de sauvegarde */
+        .toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 1055; }
         
         /* Inputs transparents */
         .form-control-transparent {
@@ -392,17 +387,14 @@ $members = $stmtMembers->fetchAll(PDO::FETCH_ASSOC);
         </div>
     </div>
 
-    <div class="position-fixed bottom-0 end-0 p-4" style="z-index: 1055;">
-        <div id="saveToast" class="toast align-items-center border-0 shadow-lg rounded-pill px-2 py-1" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="2000" style="background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px);">
+    <div class="toast-container">
+        <div id="saveToast" class="toast align-items-center text-bg-dark border-0" role="alert" aria-live="assertive" aria-atomic="true">
             <div class="d-flex">
-                <div class="toast-body d-flex align-items-center fw-medium text-dark" style="font-size: 0.95rem;">
-                    <div class="bg-success rounded-circle d-flex align-items-center justify-content-center me-3 shadow-sm" style="width: 28px; height: 28px;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="white" class="bi bi-check" viewBox="0 0 16 16">
-                          <path d="M10.97 4.97a.75.75 0 0 1 1.07 1.05l-3.99 4.99a.75.75 0 0 1-1.08.02L4.324 8.384a.75.75 0 1 1 1.06-1.06l2.094 2.093 3.473-4.425a.267.267 0 0 1 .02-.022z"/>
-                        </svg>
-                    </div>
-                    Modifications enregistrées
+                <div class="toast-body">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-check-circle-fill me-2 text-success" viewBox="0 0 16 16"><path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/></svg>
+                    Enregistré
                 </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
             </div>
         </div>
     </div>
