@@ -1,5 +1,7 @@
 # 🚀 Unify - Gestionnaire de Projets Collaboratif
 
+**🌐 Visitez le site en direct : [unify.andyl.fr](https://unify.andyl.fr)**
+
 Bienvenue sur le dépôt officiel d'**Unify**. 
 Ce projet a été développé par **Andy** dans le cadre de son projet de fin d'année au lycée. L’objectif principal d’Unify est d’offrir une plateforme sécurisée et facile à utiliser pour organiser et suivre l’avancement de projets.
 
@@ -17,8 +19,8 @@ Unify est une application web SaaS (Software as a Service) qui permet aux utilis
 * **🤝 Collaboration en Temps Réel :** * Invitation de collaborateurs par adresse email.
     * Système de notifications dynamique intégré à la barre de navigation (AJAX Polling) pour accepter/refuser les invitations.
 * **💳 Système d'Abonnement (Monétisation) :** * Intégration d'un système de forfaits (Starter, Pro, Business).
-    * Restrictions côté serveur basées sur le forfait (limite de projets et de collaborateurs).
-    * Intégration prévue avec l'API **Lemon Squeezy** via Webhooks pour valider les paiements.
+    * Restrictions côté serveur basées sur le forfait (limites de création de projets et de collaborateurs).
+    * Intégration de l'API **Lemon Squeezy** via Webhooks pour gérer et valider les paiements.
 
 ## 🛠️ Technologies Utilisées
 
@@ -29,11 +31,6 @@ Ce projet est construit avec des technologies web standards et ne nécessite auc
 * **Base de données :** MySQL (Communication sécurisée via l'extension PHP PDO).
 * **Paiement :** API Lemon Squeezy.
 
-## ⚙️ Installation et Déploiement en Local
+## 🧑‍💻 Auteur
 
-Pour faire tourner Unify sur votre machine locale (idéal pour tester avec WAMP, XAMPP ou MAMP) :
-
-1. **Cloner le dépôt :**
-   ```bash
-   git clone [https://github.com/votre-nom-utilisateur/unify.git](https://github.com/votre-nom-utilisateur/unify.git)
-   cd unify
+* **Andy** - *Développeur principal* - Projet de fin d'année.
