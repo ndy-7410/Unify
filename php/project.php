@@ -14,11 +14,13 @@ $user_id = $_SESSION["user_id"];
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_project'])) {
     $name = trim($_POST['name'] ?? '');
     $description = trim($_POST['description'] ?? '');
+    // Récupération de la deadline, null si vide
+    $deadline = !empty($_POST['deadline']) ? $_POST['deadline'] : null;
 
     if ($name !== '') {
-        $stmt = $pdo->prepare("INSERT INTO project (user_id, name, description, created_at, updated_at)
-                               VALUES (?, ?, ?, NOW(), NOW())");
-        $stmt->execute([$user_id, $name, $description]);
+        $stmt = $pdo->prepare("INSERT INTO project (user_id, name, description, deadline, created_at, updated_at)
+                               VALUES (?, ?, ?, ?, NOW(), NOW())");
+        $stmt->execute([$user_id, $name, $description, $deadline]);
         header("Location: project.php");
         exit();
     } else {
@@ -31,13 +33,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_project'])) {
     $project_id = $_POST['project_id'] ?? '';
     $name = trim($_POST['name'] ?? '');
     $description = trim($_POST['description'] ?? '');
+    // Récupération de la deadline, null si vide
+    $deadline = !empty($_POST['deadline']) ? $_POST['deadline'] : null;
 
     // Sécurité : On vérifie que c'est bien le PROPRIÉTAIRE (user_id) qui modifie
     if ($name !== '' && $project_id !== '') {
         $stmt = $pdo->prepare("UPDATE project
-                               SET name = ?, description = ?, updated_at = NOW()
+                               SET name = ?, description = ?, deadline = ?, updated_at = NOW()
                                WHERE project_id = ? AND user_id = ?");
-        $stmt->execute([$name, $description, $project_id, $user_id]);
+        $stmt->execute([$name, $description, $deadline, $project_id, $user_id]);
         header("Location: project.php");
         exit();
     } else {
@@ -58,7 +62,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_project'])) {
 }
 
 // --- RECUPERATION DES PROJETS ---
-$sql = "SELECT DISTINCT p.project_id, p.name, p.description, p.created_at, p.updated_at, p.user_id as owner_id, u.name as owner_name
+// Ajout de p.deadline dans le SELECT
+$sql = "SELECT DISTINCT p.project_id, p.name, p.description, p.deadline, p.created_at, p.updated_at, p.user_id as owner_id, u.name as owner_name
         FROM project p
         LEFT JOIN project_user pu ON p.project_id = pu.project_id
         JOIN user u ON p.user_id = u.user_id 
@@ -147,11 +152,23 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                         <?php endif; ?>
                                     </div>
                                     
-                                    <p class="card-text text-muted small flex-grow-1">
+                                    <p class="card-text text-muted small flex-grow-1 mb-2">
                                         <?= !empty($p['description']) ? htmlspecialchars($p['description']) : '<em>Aucune description</em>' ?>
                                     </p>
 
-                                    <div class="mt-4 pt-3 border-top">
+                                    <?php if (!empty($p['deadline'])): ?>
+                                        <div class="mb-3">
+                                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-2 py-1">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" class="bi bi-clock me-1 mb-1" viewBox="0 0 16 16">
+                                                    <path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71V3.5z"/>
+                                                    <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0z"/>
+                                                </svg>
+                                                Échéance : <?= date("d/m/Y", strtotime($p['deadline'])) ?>
+                                            </span>
+                                        </div>
+                                    <?php endif; ?>
+
+                                    <div class="mt-auto pt-3 border-top">
                                         <div class="d-flex justify-content-between align-items-center mb-3">
                                             <small class="text-secondary d-flex align-items-center">
                                                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" class="bi bi-person-circle me-1" viewBox="0 0 16 16">
@@ -175,6 +192,7 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                                     data-id="<?= $p['project_id'] ?>"
                                                     data-name="<?= htmlspecialchars($p['name'], ENT_QUOTES) ?>"
                                                     data-description="<?= htmlspecialchars($p['description'], ENT_QUOTES) ?>"
+                                                    data-deadline="<?= htmlspecialchars($p['deadline'] ?? '', ENT_QUOTES) ?>"
                                                     title="Paramètres">
                                                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-gear-fill" viewBox="0 0 16 16">
                                                         <path d="M9.405 1.05c-.413-1.4-2.397-1.4-2.81 0l-.1.34a1.464 1.464 0 0 1-2.105.872l-.31-.17c-1.283-.698-2.686.705-1.987 1.987l.169.311c.446.82.023 1.841-.872 2.105l-.34.1c-1.4.413-1.4 2.397 0 2.81l.34.1a1.464 1.464 0 0 1 .872 2.105l-.17.31c-.698 1.283.705 2.686 1.987 1.987l.311-.169a1.464 1.464 0 0 1 2.105.872l.1.34c.413 1.4 2.397 1.4 2.81 0l.1-.34a1.464 1.464 0 0 1 2.105-.872l.31.17c1.283.698 2.686-.705 1.987-1.987l-.169-.311a1.464 1.464 0 0 1 .872-2.105l.34-.1c1.4-.413 1.4-2.397 0-2.81l-.34-.1a1.464 1.464 0 0 1-.872-2.105l.17-.31c.698-1.283-.705-2.686-1.987-1.987l-.311.169a1.464 1.464 0 0 1-2.105-.872zM8 10.93a2.929 2.929 0 1 1 0-5.86 2.929 2.929 0 0 1 0 5.86"/>
@@ -210,7 +228,10 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         <input type="text" name="name" class="form-control mb-3" placeholder="Ex: Refonte Site Web" required>
 
                         <label class="form-label fw-semibold">Description (Optionnel)</label>
-                        <textarea name="description" class="form-control" rows="3" placeholder="Court résumé de l'objectif..."></textarea>
+                        <textarea name="description" class="form-control mb-3" rows="3" placeholder="Court résumé de l'objectif..."></textarea>
+
+                        <label class="form-label fw-semibold">Date limite / Échéance (Optionnel)</label>
+                        <input type="date" name="deadline" class="form-control">
 
                         <?php if (!empty($error)): ?>
                             <div class="alert alert-danger mt-3 py-2 small"><?= htmlspecialchars($error) ?></div>
@@ -225,7 +246,6 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
             </div>
         </div>
     </div>
-
 
     <div class="modal fade" id="editProjectModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
@@ -244,7 +264,10 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         <input type="text" name="name" id="edit_name" class="form-control mb-3" required>
 
                         <label class="form-label fw-semibold">Description</label>
-                        <textarea name="description" id="edit_description" class="form-control" rows="3"></textarea>
+                        <textarea name="description" id="edit_description" class="form-control mb-3" rows="3"></textarea>
+
+                        <label class="form-label fw-semibold">Date limite / Échéance (Optionnel)</label>
+                        <input type="date" name="deadline" id="edit_deadline" class="form-control">
 
                         <?php if (!empty($update_error)): ?>
                             <div class="alert alert-danger mt-3 py-2 small"><?= htmlspecialchars($update_error) ?></div>
@@ -273,12 +296,13 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
             new bootstrap.Modal(document.getElementById('createProjectModal')).show();
         });
 
-        // OUVERTURE MODAL EDITION
+        // OUVERTURE MODAL EDITION (Récupération de la deadline en JavaScript)
         document.querySelectorAll('.editBtn').forEach(function(btn) {
             btn.addEventListener('click', function() {
                 document.getElementById('edit_project_id').value = btn.dataset.id;
                 document.getElementById('edit_name').value = btn.dataset.name;
                 document.getElementById('edit_description').value = btn.dataset.description;
+                document.getElementById('edit_deadline').value = btn.dataset.deadline; // Charge la date
                 new bootstrap.Modal(document.getElementById('editProjectModal')).show();
             });
         });
