@@ -64,10 +64,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_profile'])) {
     exit();
 }
 
-// --- 5. RÉCUPÉRATION DONNÉES UTILISATEUR (Pour affichage) ---
-$stmt = $pdo->prepare("SELECT name, email, created_at FROM user WHERE user_id = :id");
+// --- 5. RÉCUPÉRATION DONNÉES UTILISATEUR (AJOUT DE LA COLONNE 'plan') ---
+$stmt = $pdo->prepare("SELECT name, email, plan, created_at FROM user WHERE user_id = :id");
 $stmt->execute(['id' => $user_id]);
 $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+$user_plan = $user['plan'] ?? 'starter'; // Définir "starter" par défaut
 ?>
 
 <!DOCTYPE html>
@@ -93,6 +95,56 @@ $user = $stmt->fetch(PDO::FETCH_ASSOC);
                     <p class="text-muted">Gérez vos informations personnelles et votre sécurité.</p>
                 </div>
 
+                <div class="card shadow-sm border-0 mb-4">
+                    <div class="card-body p-4">
+                        <div class="d-flex align-items-center mb-4 border-bottom pb-3">
+                            <div class="bg-light rounded-circle p-2 me-3 text-warning">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-star-fill" viewBox="0 0 16 16">
+                                    <path d="M3.612 15.443c-.386.198-.824-.149-.746-.592l.83-4.73L.173 6.765c-.329-.314-.158-.888.283-.95l4.898-.696L7.538.792c.197-.39.73-.39.927 0l2.184 4.327 4.898.696c.441.062.612.636.282.95l-3.522 3.356.83 4.73c.078.443-.36.79-.746.592L8 13.187l-4.389 2.256z"/>
+                                </svg>
+                            </div>
+                            <h5 class="card-title mb-0 fw-bold">Mon Abonnement Actuel</h5>
+                        </div>
+
+                        <div class="d-flex align-items-center justify-content-between bg-body-tertiary p-3 rounded-3 border">
+                            <div class="d-flex align-items-center">
+                                <?php if ($user_plan == 'starter'): ?>
+                                    <span class="fs-4 me-3">⭐</span>
+                                    <div>
+                                        <p class="mb-0 fw-bold text-dark fs-5">Forfait Starter</p>
+                                        <small class="text-muted">Jusqu'à 3 projets. Sans collaboration.</small>
+                                    </div>
+                                <?php elseif ($user_plan == 'pro'): ?>
+                                    <span class="fs-4 me-3">🌟</span>
+                                    <div>
+                                        <p class="mb-0 fw-bold text-dark fs-5">Forfait Pro</p>
+                                        <small class="text-muted">Jusqu'à 5 projets et 10 collaborateurs.</small>
+                                    </div>
+                                <?php elseif ($user_plan == 'business'): ?>
+                                    <span class="fs-4 me-3">👑</span>
+                                    <div>
+                                        <p class="mb-0 fw-bold text-dark fs-5">Forfait Business</p>
+                                        <small class="text-muted">Projets et collaboration illimités.</small>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+
+                            <?php if ($user_plan == 'starter'): ?>
+                                <span class="badge bg-secondary rounded-pill px-3 py-2 shadow-sm">Gratuit</span>
+                            <?php elseif ($user_plan == 'pro'): ?>
+                                <span class="badge bg-primary rounded-pill px-3 py-2 shadow-sm">Premium</span>
+                            <?php else: ?>
+                                <span class="badge bg-dark rounded-pill px-3 py-2 shadow-sm">Ultimate</span>
+                            <?php endif; ?>
+                        </div>
+
+                        <?php if ($user_plan !== 'business'): ?>
+                            <div class="mt-3 text-end">
+                                <a href="price.php" class="btn btn-outline-primary btn-sm rounded-pill px-3 fw-medium">Améliorer mon abonnement</a>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
                 <div class="card shadow-sm border-0 mb-4">
                     <div class="card-body p-4">
                         <div class="d-flex align-items-center mb-4 border-bottom pb-3">

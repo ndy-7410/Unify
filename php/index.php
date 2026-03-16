@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="fr">
 <?php
-
 require 'database.php';
 require 'stat.php';
 session_start();
@@ -9,6 +8,7 @@ session_start();
 
 <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Unify | Accueil</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
@@ -21,6 +21,14 @@ session_start();
             font-size: 0.85rem;
             min-width: 100px;
             text-align: right;
+        }
+
+        /* Sur mobile, on aligne la date à gauche quand elle passe en dessous */
+        @media (max-width: 575.98px) {
+            .changelog-date {
+                text-align: left;
+                margin-top: 8px;
+            }
         }
 
         .feature-icon-box {
@@ -36,12 +44,11 @@ session_start();
 
 <body>
     <div>
-        <?php
-        include 'navbar.php';
-        ?>
+        <?php include 'navbar.php'; ?>
     </div>
-    <div class="px-4 py-5 my-5 text-center">
-        <img class="d-block mx-auto mb-4" src="logo.png" alt="" height="50" />
+
+    <div class="px-3 px-md-4 py-5 my-5 text-center">
+        <img class="d-block mx-auto mb-4" src="logo.png" alt="Logo Unify" style="height: 70px; width: auto;" />
         <h1 class="display-5 fw-bold text-body-emphasis">Unify</h1>
         <div class="col-lg-6 mx-auto">
             <p class="lead mb-4">
@@ -67,14 +74,14 @@ session_start();
                         </a>
                     </div>
                 <?php } ?>
-                <div>
+                <div class="d-grid gap-2 d-sm-flex justify-content-sm-center">
                     <a type="button" class="btn btn-secondary btn-lg px-4 gap-3" href="#changelog">
                         Voir les mises à jour
                     </a>
                 </div>
             </div>
 
-            <p class="text-muted mt-3 small">
+            <p class="text-muted mt-3 small px-3">
                 <small>⚠️ Les données sur la version de démonstration peuvent être réinitialisées périodiquement.</small>
             </p>
         </div>
@@ -82,7 +89,7 @@ session_start();
 
     <div class="container px-4 py-5" id="features">
         <h2 class="pb-2 border-bottom mb-4">Fonctionnalités Clés</h2>
-        <div class="row g-4 py-4 row-cols-1 row-cols-lg-3">
+        <div class="row g-4 py-4 row-cols-1 row-cols-md-2 row-cols-lg-3">
 
             <div class="col d-flex align-items-start">
                 <div class="feature-icon-box bg-primary-subtle text-primary me-3 flex-shrink-0">
@@ -124,42 +131,60 @@ session_start();
         </div>
     </div>
 
-    <div class="container text-center my-5">
+    <div class="container text-center my-5 px-3">
         <h2 class="pb-2 border-bottom mb-4">Statistiques Unify</h2>
         <div class="row row-cols-1 row-cols-md-3 g-4 mt-3">
 
             <div class="col">
-                <div class="card shadow-sm p-4">
+                <div class="card shadow-sm p-4 h-100">
                     <h3 class="fw-bold"><?php echo htmlspecialchars($userCount, ENT_QUOTES); ?></h3>
-                    <p class="text-muted">Utilisateurs enregistrés</p>
+                    <p class="text-muted mb-0">Utilisateurs enregistrés</p>
                 </div>
             </div>
 
             <div class="col">
-                <div class="card shadow-sm p-4">
+                <div class="card shadow-sm p-4 h-100">
                     <h3 class="fw-bold"><?php echo htmlspecialchars($projectCount, ENT_QUOTES); ?></h3>
-                    <p class="text-muted">Projets créés</p>
+                    <p class="text-muted mb-0">Projets créés</p>
                 </div>
             </div>
 
             <div class="col">
-                <div class="card shadow-sm p-4">
+                <div class="card shadow-sm p-4 h-100">
                     <h3 class="fw-bold"><?php echo htmlspecialchars($taskCount, ENT_QUOTES); ?></h3>
-                    <p class="text-muted">Tâches enregistrées</p>
+                    <p class="text-muted mb-0">Tâches enregistrées</p>
                 </div>
             </div>
 
         </div>
     </div>
-    <div class="container py-5" id="changelog">
+
+    <div class="container py-5 px-3 px-md-4" id="changelog">
         <h2 class="pb-3 mb-4 border-bottom">Journal des modifications</h2>
 
         <div class="list-group shadow-sm">
 
             <div class="list-group-item d-flex gap-3 py-3 bg-body-tertiary">
-                <div class="d-flex gap-2 w-100 justify-content-between">
+                <div class="d-flex flex-column flex-sm-row gap-2 w-100 justify-content-between">
                     <div>
-                        <h6 class="mb-0 fw-bold text-primary">v1.3.0 - Ergonomie & Temps réel</h6>
+                        <h6 class="mb-0 fw-bold text-primary">v1.4.0 - Responsive & Simulateur de Paiement</h6>
+                        <p class="mb-0 opacity-75 mt-2">Adaptation mobile et refonte du système d'abonnement.</p>
+                        <ul class="mt-2 mb-1 small text-muted ps-3">
+                            <li><strong>Responsive Design :</strong> Optimisation de l'affichage sur téléphones et tablettes (tableaux défilants, menus adaptés).</li>
+                            <li><strong>Paiement :</strong> Remplacement de l'API externe par un simulateur interne de carte bancaire pour les soutenances.</li>
+                            <li><strong>Abonnements :</strong> Possibilité de rétrograder (downgrade) son forfait vers une offre inférieure.</li>
+                            <li><strong>Interface :</strong> Ajout d'une fonctionnalité pour fermer la barre de navigation sur mobile en cliquant à l'extérieur.</li>
+                            <li><strong>Maintenance :</strong> Création d'une page de maintenance personnalisée.</li>
+                        </ul>
+                    </div>
+                    <small class="opacity-50 text-nowrap changelog-date">16 Mars 2026</small>
+                </div>
+            </div>
+
+            <div class="list-group-item d-flex gap-3 py-3">
+                <div class="d-flex flex-column flex-sm-row gap-2 w-100 justify-content-between">
+                    <div>
+                        <h6 class="mb-0 fw-bold">v1.3.0 - Ergonomie & Temps réel</h6>
                         <p class="mb-0 opacity-75 mt-2">Refonte visuelle et sauvegarde automatique.</p>
                         <ul class="mt-2 mb-1 small text-muted ps-3">
                             <li><strong>Auto-save :</strong> Sauvegarde automatique des tâches sans recharger la page.</li>
@@ -175,7 +200,7 @@ session_start();
             </div>
 
             <div class="list-group-item d-flex gap-3 py-3">
-                <div class="d-flex gap-2 w-100 justify-content-between">
+                <div class="d-flex flex-column flex-sm-row gap-2 w-100 justify-content-between">
                     <div>
                         <h6 class="mb-0 fw-bold">v1.2.0 - Module de Collaboration</h6>
                         <p class="mb-0 opacity-75 mt-2">Mise en place du travail d'équipe.</p>
@@ -191,7 +216,7 @@ session_start();
             </div>
 
             <div class="list-group-item d-flex gap-3 py-3">
-                <div class="d-flex gap-2 w-100 justify-content-between">
+                <div class="d-flex flex-column flex-sm-row gap-2 w-100 justify-content-between">
                     <div>
                         <h6 class="mb-0 fw-bold">v1.1.0 - Gestion avancée</h6>
                         <p class="mb-0 opacity-75 mt-2">Amélioration du détail des tâches.</p>
@@ -206,7 +231,7 @@ session_start();
             </div>
 
             <div class="list-group-item d-flex gap-3 py-3">
-                <div class="d-flex gap-2 w-100 justify-content-between">
+                <div class="d-flex flex-column flex-sm-row gap-2 w-100 justify-content-between">
                     <div>
                         <h6 class="mb-0 fw-bold">v1.0.0 - Lancement</h6>
                         <p class="mb-0 opacity-75 mt-2">Première version publique.</p>
@@ -221,10 +246,9 @@ session_start();
 
         </div>
     </div>
+
     <div>
-        <?php
-        include 'footer.php';
-        ?>
+        <?php include 'footer.php'; ?>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
 </body>

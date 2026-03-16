@@ -5,6 +5,31 @@
 require 'database.php';
 require 'stat.php';
 session_start();
+
+// --- 1. GESTION DE LA RÉTROGRADATION (DOWNGRADE) ---
+$success_msg = "";
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['downgrade_plan'])) {
+    if (isset($_SESSION["user_id"])) {
+        $new_plan = $_POST['downgrade_plan'];
+        
+        // Mise à jour directe dans la base de données
+        $stmt = $pdo->prepare("UPDATE user SET plan = ? WHERE user_id = ?");
+        $stmt->execute([$new_plan, $_SESSION["user_id"]]);
+        
+        $success_msg = "Votre abonnement a bien été rétrogradé vers le forfait " . ucfirst($new_plan) . ".";
+    }
+}
+
+// --- 2. RÉCUPÉRER LE PLAN ACTUEL DE L'UTILISATEUR ---
+$current_plan = 'starter';
+if (isset($_SESSION["user_id"])) {
+    $stmtPlan = $pdo->prepare("SELECT plan FROM user WHERE user_id = ?");
+    $stmtPlan->execute([$_SESSION["user_id"]]);
+    $fetched_plan = $stmtPlan->fetchColumn();
+    if ($fetched_plan) {
+        $current_plan = $fetched_plan;
+    }
+}
 ?>
 
 <head>
@@ -23,15 +48,15 @@ session_start();
         }
         .card:hover {
             transform: translateY(-5px);
-            box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
+            box-shadow: 0 .5rem 1rem rgba(0, 0, 0, .15) !important;
         }
 
-        /* CORRECTION : Taille des icônes unifiée */
+        /* Taille des icônes unifiée */
         .bi {
-            width: 1.2em;  /* Taille adaptée au texte */
+            width: 1.2em;
             height: 1.2em;
-            vertical-align: -0.125em; /* Alignement vertical propre */
-            fill: currentColor; /* Prend la couleur du texte parent ou de la classe text-... */
+            vertical-align: -0.125em;
+            fill: currentColor;
         }
     </style>
 </head>
@@ -43,10 +68,10 @@ session_start();
 
     <svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
         <symbol id="check" viewBox="0 0 16 16">
-            <path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/>
+            <path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z" />
         </symbol>
         <symbol id="x" viewBox="0 0 16 16">
-            <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/>
+            <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z" />
         </symbol>
     </svg>
 
@@ -57,12 +82,18 @@ session_start();
                 <p class="fs-5 text-muted">
                     Commencez petit et grandissez avec nous. Choisissez l'offre parfaitement adaptée à la taille de votre équipe.
                 </p>
+                
+                <?php if ($success_msg): ?>
+                    <div class="alert alert-success mt-4 shadow-sm border-0">
+                        <?= htmlspecialchars($success_msg) ?>
+                    </div>
+                <?php endif; ?>
             </div>
         </header>
 
         <main>
             <div class="row row-cols-1 row-cols-md-3 mb-3 text-center">
-                
+
                 <div class="col">
                     <div class="card mb-4 rounded-3 shadow-sm h-100">
                         <div class="card-header py-3">
@@ -71,26 +102,20 @@ session_start();
                         <div class="card-body d-flex flex-column">
                             <h1 class="card-title pricing-card-title">0€<small class="text-body-secondary fw-light">/mois</small></h1>
                             <ul class="list-unstyled mt-3 mb-4 text-start">
-                                <li class="d-flex mb-2 align-items-center">
-                                    <svg class="bi me-2 text-primary"><use xlink:href="#check"/></svg> 
-                                    Jusqu'à 3 projets
-                                </li>
-                                <li class="d-flex mb-2 align-items-center">
-                                    <svg class="bi me-2 text-primary"><use xlink:href="#check"/></svg> 
-                                    Jusqu'à 30 tâches
-                                </li>
-                                <li class="d-flex mb-2 align-items-center text-muted">
-                                    <svg class="bi me-2"><use xlink:href="#x"/></svg> 
-                                    Pas de collaboration
-                                </li>
-                                <li class="d-flex mb-2 align-items-center text-muted">
-                                    <svg class="bi me-2"><use xlink:href="#x"/></svg> 
-                                    Support standard
-                                </li>
+                                <li class="d-flex mb-2 align-items-center"><svg class="bi me-2 text-primary"><use xlink:href="#check" /></svg> Jusqu'à 3 projets</li>
+                                <li class="d-flex mb-2 align-items-center"><svg class="bi me-2 text-primary"><use xlink:href="#check" /></svg> Jusqu'à 30 tâches</li>
+                                <li class="d-flex mb-2 align-items-center text-muted"><svg class="bi me-2"><use xlink:href="#x" /></svg> Pas de collaboration</li>
+                                <li class="d-flex mb-2 align-items-center text-muted"><svg class="bi me-2"><use xlink:href="#x" /></svg> Support standard</li>
                             </ul>
                             <div class="mt-auto">
                                 <?php if (isset($_SESSION["user_id"])) { ?>
-                                    <button type="button" class="w-100 btn btn-lg btn-outline-primary" disabled>Votre offre actuelle</button>
+                                    <?php if ($current_plan == 'starter') { ?>
+                                        <button type="button" class="w-100 btn btn-lg btn-success" disabled>Votre offre actuelle</button>
+                                    <?php } else { ?>
+                                        <form method="POST" onsubmit="return confirm('Êtes-vous sûr de vouloir rétrograder vers le forfait Starter ? Vous perdrez vos avantages Premium.');">
+                                            <button type="submit" name="downgrade_plan" value="starter" class="w-100 btn btn-lg btn-outline-danger">Rétrograder vers Starter</button>
+                                        </form>
+                                    <?php } ?>
                                 <?php } else { ?>
                                     <a href="register.php" class="w-100 btn btn-lg btn-outline-primary">S'inscrire gratuitement</a>
                                 <?php } ?>
@@ -107,25 +132,25 @@ session_start();
                         <div class="card-body d-flex flex-column">
                             <h1 class="card-title pricing-card-title">5€<small class="text-body-secondary fw-light">/mois</small></h1>
                             <ul class="list-unstyled mt-3 mb-4 text-start">
-                                <li class="d-flex mb-2 align-items-center">
-                                    <svg class="bi me-2 text-primary"><use xlink:href="#check"/></svg> 
-                                    <strong>5 projets</strong> actifs
-                                </li>
-                                <li class="d-flex mb-2 align-items-center">
-                                    <svg class="bi me-2 text-primary"><use xlink:href="#check"/></svg> 
-                                    <strong>50 tâches</strong> par projet
-                                </li>
-                                <li class="d-flex mb-2 align-items-center">
-                                    <svg class="bi me-2 text-primary"><use xlink:href="#check"/></svg> 
-                                    Collaboration (10 utilisateurs)
-                                </li>
-                                <li class="d-flex mb-2 align-items-center">
-                                    <svg class="bi me-2 text-primary"><use xlink:href="#check"/></svg> 
-                                    Support email prioritaire
-                                </li>
+                                <li class="d-flex mb-2 align-items-center"><svg class="bi me-2 text-primary"><use xlink:href="#check" /></svg> <strong>5 projets</strong> actifs</li>
+                                <li class="d-flex mb-2 align-items-center"><svg class="bi me-2 text-primary"><use xlink:href="#check" /></svg> <strong>50 tâches</strong> par projet</li>
+                                <li class="d-flex mb-2 align-items-center"><svg class="bi me-2 text-primary"><use xlink:href="#check" /></svg> Collaboration (10 utilisateurs)</li>
+                                <li class="d-flex mb-2 align-items-center"><svg class="bi me-2 text-primary"><use xlink:href="#check" /></svg> Support email prioritaire</li>
                             </ul>
                             <div class="mt-auto">
-                                <button type="button" class="w-100 btn btn-lg btn-primary">Passer en Pro</button>
+                                <?php if (isset($_SESSION["user_id"])) { ?>
+                                    <?php if ($current_plan == 'pro') { ?>
+                                        <button type="button" class="w-100 btn btn-lg btn-success" disabled>Votre offre actuelle</button>
+                                    <?php } elseif ($current_plan == 'business') { ?>
+                                        <form method="POST" onsubmit="return confirm('Êtes-vous sûr de vouloir rétrograder vers le forfait Pro ?');">
+                                            <button type="submit" name="downgrade_plan" value="pro" class="w-100 btn btn-lg btn-outline-danger">Rétrograder vers Pro</button>
+                                        </form>
+                                    <?php } else { ?>
+                                        <a href="checkout.php?plan=pro" class="w-100 btn btn-lg btn-primary">Passer en Pro</a>
+                                    <?php } ?>
+                                <?php } else { ?>
+                                    <a href="login.php" class="w-100 btn btn-lg btn-primary">Se connecter pour acheter</a>
+                                <?php } ?>
                             </div>
                         </div>
                     </div>
@@ -139,32 +164,28 @@ session_start();
                         <div class="card-body d-flex flex-column">
                             <h1 class="card-title pricing-card-title">15€<small class="text-body-secondary fw-light">/mois</small></h1>
                             <ul class="list-unstyled mt-3 mb-4 text-start">
-                                <li class="d-flex mb-2 align-items-center">
-                                    <svg class="bi me-2 text-primary"><use xlink:href="#check"/></svg> 
-                                    Projets <strong>illimités</strong>
-                                </li>
-                                <li class="d-flex mb-2 align-items-center">
-                                    <svg class="bi me-2 text-primary"><use xlink:href="#check"/></svg> 
-                                    Tâches <strong>illimitées</strong>
-                                </li>
-                                <li class="d-flex mb-2 align-items-center">
-                                    <svg class="bi me-2 text-primary"><use xlink:href="#check"/></svg> 
-                                    Collaboration <strong>illimitée</strong>
-                                </li>
-                                <li class="d-flex mb-2 align-items-center">
-                                    <svg class="bi me-2 text-primary"><use xlink:href="#check"/></svg> 
-                                    Support dédié 24/7
-                                </li>
+                                <li class="d-flex mb-2 align-items-center"><svg class="bi me-2 text-primary"><use xlink:href="#check" /></svg> Projet <strong> illimités</strong></li>
+                                <li class="d-flex mb-2 align-items-center"><svg class="bi me-2 text-primary"><use xlink:href="#check" /></svg> Tâches <strong>illimitées</strong></li>
+                                <li class="d-flex mb-2 align-items-center"><svg class="bi me-2 text-primary"><use xlink:href="#check" /></svg> Collaboration <strong>illimitée</strong></li>
+                                <li class="d-flex mb-2 align-items-center"><svg class="bi me-2 text-primary"><use xlink:href="#check" /></svg> Support dédié 24/7</li>
                             </ul>
                             <div class="mt-auto">
-                                <button type="button" class="w-100 btn btn-lg btn-primary">Nous contacter</button>
+                                <?php if (isset($_SESSION["user_id"])) { ?>
+                                    <?php if ($current_plan == 'business') { ?>
+                                        <button type="button" class="w-100 btn btn-lg btn-success" disabled>Votre offre actuelle</button>
+                                    <?php } else { ?>
+                                        <a href="checkout.php?plan=business" class="w-100 btn btn-lg btn-primary">Passer en Business</a>
+                                    <?php } ?>
+                                <?php } else { ?>
+                                    <a href="login.php" class="w-100 btn btn-lg btn-primary">Se connecter pour acheter</a>
+                                <?php } ?>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <h2 class="display-6 text-center mb-4">Comparatif détaillé</h2>
+            <h2 class="display-6 text-center mb-4 mt-5">Comparatif détaillé</h2>
 
             <div class="table-responsive">
                 <table class="table text-center table-hover align-middle">
@@ -179,9 +200,9 @@ session_start();
                     <tbody>
                         <tr>
                             <th scope="row" class="text-start">Accès public</th>
-                            <td><svg class="bi text-primary"><use xlink:href="#check"/></svg></td>
-                            <td><svg class="bi text-primary"><use xlink:href="#check"/></svg></td>
-                            <td><svg class="bi text-primary"><use xlink:href="#check"/></svg></td>
+                            <td><svg class="bi text-primary"><use xlink:href="#check" /></svg></td>
+                            <td><svg class="bi text-primary"><use xlink:href="#check" /></svg></td>
+                            <td><svg class="bi text-primary"><use xlink:href="#check" /></svg></td>
                         </tr>
                         <tr>
                             <th scope="row" class="text-start">Nombre de Projets</th>
@@ -204,8 +225,8 @@ session_start();
                         <tr>
                             <th scope="row" class="text-start">Statistiques avancées</th>
                             <td>-</td>
-                            <td><svg class="bi text-primary"><use xlink:href="#check"/></svg></td>
-                            <td><svg class="bi text-primary"><use xlink:href="#check"/></svg></td>
+                            <td><svg class="bi text-primary"><use xlink:href="#check" /></svg></td>
+                            <td><svg class="bi text-primary"><use xlink:href="#check" /></svg></td>
                         </tr>
                         <tr>
                             <th scope="row" class="text-start">Support</th>
@@ -222,7 +243,8 @@ session_start();
     <div>
         <?php include 'footer.php'; ?>
     </div>
-    
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
 </body>
+
 </html>

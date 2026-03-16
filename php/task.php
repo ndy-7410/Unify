@@ -35,7 +35,7 @@ if (!$project) {
 
 $is_owner = ($project['owner_id'] == $user_id);
 
-// --- CORRECTION DU TRI ICI ---
+// --- TRI ---
 $sort_column = 't.created_at';
 $sort_order = 'ASC';
 $valid_columns = ['status', 'priority', 'deadline'];
@@ -67,11 +67,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_update'])) {
     $allowed_fields = ['name', 'description', 'status_id', 'priority_id', 'deadline'];
 
     if (in_array($field, $allowed_fields)) {
-
         if ($field === 'deadline' && empty($value)) {
             $value = null;
         }
-
         $sql = "UPDATE task SET $field = :value, updated_at = NOW() WHERE task_id = :task_id AND project_id = :project_id";
         $stmt = $pdo->prepare($sql);
         $result = $stmt->execute([
@@ -125,35 +123,53 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Gestion Membres
     if (isset($_POST['add_member'])) {
         $email = trim($_POST['email']);
-        $stmtUser = $pdo->prepare("SELECT user_id FROM user WHERE email = ?");
-        $stmtUser->execute([$email]);
-        $targetUser = $stmtUser->fetch(PDO::FETCH_ASSOC);
 
-        if ($targetUser) {
-            $targetUserId = $targetUser['user_id'];
+        $stmtOwnerPlan = $pdo->prepare("SELECT plan FROM user WHERE user_id = ?");
+        $stmtOwnerPlan->execute([$project['owner_id']]);
+        $ownerPlan = $stmtOwnerPlan->fetchColumn() ?: 'starter';
 
-            $stmtCheckMember = $pdo->prepare("SELECT * FROM project_user WHERE project_id = ? AND user_id = ?");
-            $stmtCheckMember->execute([$project_id, $targetUserId]);
+        if ($ownerPlan === 'starter') {
+            $member_error = "Le forfait actuel (Starter) ne permet pas d'inviter des collaborateurs. Le propriétaire du projet doit améliorer son abonnement.";
+        } else {
+            $stmtCountMembers = $pdo->prepare("SELECT COUNT(*) FROM project_user WHERE project_id = ? AND role = 'member'");
+            $stmtCountMembers->execute([$project_id]);
+            $memberCount = $stmtCountMembers->fetchColumn();
 
-            if ($targetUserId == $project['owner_id']) {
-                $member_error = "Cet utilisateur est déjà le propriétaire du projet.";
-            } elseif ($stmtCheckMember->fetch()) {
-                $member_error = "Cet utilisateur est déjà membre du projet.";
+            $maxMembers = ($ownerPlan === 'pro') ? 10 : 999999;
+
+            if ($memberCount >= $maxMembers) {
+                $member_error = "Limite atteinte. Le forfait " . ucfirst($ownerPlan) . " permet un maximum de $maxMembers collaborateurs.";
             } else {
-                $stmtCheckInvite = $pdo->prepare("SELECT * FROM project_invitation WHERE project_id = ? AND email = ? AND status = 'pending'");
-                $stmtCheckInvite->execute([$project_id, $email]);
+                $stmtUser = $pdo->prepare("SELECT user_id FROM user WHERE email = ?");
+                $stmtUser->execute([$email]);
+                $targetUser = $stmtUser->fetch(PDO::FETCH_ASSOC);
 
-                if ($stmtCheckInvite->fetch()) {
-                    $member_error = "Une invitation est déjà en attente pour cet utilisateur.";
+                if ($targetUser) {
+                    $targetUserId = $targetUser['user_id'];
+                    $stmtCheckMember = $pdo->prepare("SELECT * FROM project_user WHERE project_id = ? AND user_id = ?");
+                    $stmtCheckMember->execute([$project_id, $targetUserId]);
+
+                    if ($targetUserId == $project['owner_id']) {
+                        $member_error = "Cet utilisateur est déjà le propriétaire du projet.";
+                    } elseif ($stmtCheckMember->fetch()) {
+                        $member_error = "Cet utilisateur est déjà membre du projet.";
+                    } else {
+                        $stmtCheckInvite = $pdo->prepare("SELECT * FROM project_invitation WHERE project_id = ? AND email = ? AND status = 'pending'");
+                        $stmtCheckInvite->execute([$project_id, $email]);
+
+                        if ($stmtCheckInvite->fetch()) {
+                            $member_error = "Une invitation est déjà en attente pour cet utilisateur.";
+                        } else {
+                            $token = bin2hex(random_bytes(16));
+                            $stmtInvite = $pdo->prepare("INSERT INTO project_invitation (project_id, email, token, status, created_at) VALUES (?, ?, ?, 'pending', NOW())");
+                            $stmtInvite->execute([$project_id, $email, $token]);
+                            $member_success = "L'invitation a été envoyée à $email avec succès !";
+                        }
+                    }
                 } else {
-                    $token = bin2hex(random_bytes(16));
-                    $stmtInvite = $pdo->prepare("INSERT INTO project_invitation (project_id, email, token, status, created_at) VALUES (?, ?, ?, 'pending', NOW())");
-                    $stmtInvite->execute([$project_id, $email, $token]);
-                    $member_success = "L'invitation a été envoyée à $email avec succès !";
+                    $member_error = "Aucun compte Unify trouvé avec cette adresse email.";
                 }
             }
-        } else {
-            $member_error = "Aucun compte Unify trouvé avec cette adresse email.";
         }
     }
 
@@ -180,7 +196,6 @@ $sqlTasks = "SELECT t.task_id, t.name, t.description, t.deadline, t.created_at, 
           JOIN user u ON t.user_id = u.user_id
           WHERE t.project_id=:project_id";
 
-// Modification pour que les "deadline" vides aillent à la fin si on trie par échéance
 if ($sort_column === 't.deadline' && $sort_order === 'ASC') {
     $sqlTasks .= " ORDER BY t.deadline IS NULL, t.deadline ASC";
 } else {
@@ -202,9 +217,8 @@ $members = $stmtMembers->fetchAll(PDO::FETCH_ASSOC);
 
 <head>
     <meta charset="UTF-8">
-    <title>Unify | Tâches</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"> <title>Unify | Tâches</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
     <style>
         .creator-badge {
             font-size: 0.75rem;
@@ -338,6 +352,11 @@ $members = $stmtMembers->fetchAll(PDO::FETCH_ASSOC);
             padding-bottom: 1rem !important;
         }
 
+        /* --- FORCER LE TABLEAU À GARDER UNE BONNE TAILLE SUR MOBILE --- */
+        .table-mobile-responsive {
+            min-width: 900px;
+        }
+
         /* --- STYLE MENU DÉROULANT (PILULE) --- */
         .select-minimal {
             appearance: none;
@@ -393,7 +412,7 @@ $members = $stmtMembers->fetchAll(PDO::FETCH_ASSOC);
 
     <?php include 'navbar.php'; ?>
 
-    <section class="py-5 container">
+    <section class="py-5 container px-3">
         <div class="row py-lg-3">
             <div class="col-lg-10 mx-auto">
                 <div class="text-center mb-4">
@@ -447,7 +466,7 @@ $members = $stmtMembers->fetchAll(PDO::FETCH_ASSOC);
                 <?php endif; ?>
 
                 <div class="text-center mt-4">
-                    <button class="btn btn-dark px-4 py-2 rounded-pill" id="showCreateTask">
+                    <button class="btn btn-dark px-4 py-2 rounded-pill shadow-sm" id="showCreateTask">
                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" class="bi bi-plus-lg me-2" viewBox="0 0 16 16">
                             <path fill-rule="evenodd" d="M8 2a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 2" />
                         </svg>
@@ -458,10 +477,10 @@ $members = $stmtMembers->fetchAll(PDO::FETCH_ASSOC);
         </div>
     </section>
 
-    <div class="container pb-5 flex-grow-1">
+    <div class="container pb-5 flex-grow-1 px-3">
 
-        <div class="d-flex justify-content-end mb-3 align-items-center small text-muted">
-            <span class="me-2">Trier par :</span>
+        <div class="d-flex flex-wrap justify-content-center justify-content-md-end mb-3 align-items-center small text-muted gap-2">
+            <span>Trier par :</span>
             <div class="btn-group btn-group-sm">
                 <a href="?project_id=<?= $project_id ?>&sort=deadline&order=ASC" class="btn <?= $current_sort == 'deadline' ? 'btn-secondary' : 'btn-outline-secondary' ?>">Échéance</a>
                 <a href="?project_id=<?= $project_id ?>&sort=status&order=ASC" class="btn <?= $current_sort == 'status' ? 'btn-secondary' : 'btn-outline-secondary' ?>">Statut</a>
@@ -473,15 +492,15 @@ $members = $stmtMembers->fetchAll(PDO::FETCH_ASSOC);
         </div>
 
         <div class="table-responsive rounded-3 border shadow-sm">
-            <table class="table table-hover mb-0">
+            <table class="table table-hover mb-0 table-mobile-responsive">
                 <thead class="table-light">
                     <tr>
-                        <th style="width: 20%;">Tâche</th>
+                        <th style="width: 25%;">Tâche</th>
                         <th style="width: 25%;">Description</th>
                         <th style="width: 15%;" class="text-center">Échéance</th>
                         <th style="width: 15%;" class="text-center">Statut</th>
                         <th style="width: 15%;" class="text-center">Priorité</th>
-                        <th style="width: 10%;" class="text-center">Actions</th>
+                        <th style="width: 5%;" class="text-center">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="bg-white">
@@ -490,7 +509,7 @@ $members = $stmtMembers->fetchAll(PDO::FETCH_ASSOC);
                                 <td>
                                     <input type="text" class="form-control form-control-transparent fw-semibold task-input"
                                         data-field="name" value="<?= htmlspecialchars($task['name']) ?>">
-                                    <span class="creator-badge">
+                                    <span class="creator-badge ms-2">
                                         Par <?= htmlspecialchars($task['creator_name']) ?>, <?= date('d/m', strtotime($task['created_at'])) ?>
                                     </span>
                                 </td>
@@ -499,14 +518,14 @@ $members = $stmtMembers->fetchAll(PDO::FETCH_ASSOC);
                                         data-field="description" value="<?= htmlspecialchars($task['description']) ?>">
                                 </td>
 
-                                <td class="text-center">
+                                <td class="text-center align-middle">
                                     <input type="date" class="form-control form-control-sm form-control-transparent task-input mx-auto text-center"
                                         style="max-width: 130px; font-size: 0.85rem; font-weight: 500;"
                                         data-field="deadline" value="<?= htmlspecialchars($task['deadline'] ?? '') ?>">
                                 </td>
 
-                                <td class="text-center">
-                                    <select class="form-select form-select-sm select-minimal task-input mx-auto" data-field="status_id">
+                                <td class="text-center align-middle">
+                                    <select class="form-select form-select-sm select-minimal task-input mx-auto" data-field="status_id" style="width: 140px;">
                                         <option value="1" <?= $task['status_id'] == 1 ? 'selected' : '' ?>>⚪ À faire</option>
                                         <option value="2" <?= $task['status_id'] == 2 ? 'selected' : '' ?>>🔵 En cours</option>
                                         <option value="3" <?= $task['status_id'] == 3 ? 'selected' : '' ?>>🟢 Terminé</option>
@@ -514,19 +533,19 @@ $members = $stmtMembers->fetchAll(PDO::FETCH_ASSOC);
                                         <option value="5" <?= $task['status_id'] == 5 ? 'selected' : '' ?>>🔴 Bloqué</option>
                                     </select>
                                 </td>
-                                <td class="text-center">
-                                    <select class="form-select form-select-sm select-minimal task-input mx-auto" data-field="priority_id">
+                                <td class="text-center align-middle">
+                                    <select class="form-select form-select-sm select-minimal task-input mx-auto" data-field="priority_id" style="width: 140px;">
                                         <option value="1" <?= $task['priority_id'] == 1 ? 'selected' : '' ?>>⚪ Minimum</option>
                                         <option value="2" <?= $task['priority_id'] == 2 ? 'selected' : '' ?>>🔵 Moyen</option>
                                         <option value="3" <?= $task['priority_id'] == 3 ? 'selected' : '' ?>>🟠 Important</option>
                                         <option value="4" <?= $task['priority_id'] == 4 ? 'selected' : '' ?>>🔴 Urgent</option>
                                     </select>
                                 </td>
-                                <td class="text-center">
-                                    <form method="POST" onsubmit="return confirm('Supprimer cette tâche ?');" class="d-inline-block mt-1">
+                                <td class="text-center align-middle">
+                                    <form method="POST" onsubmit="return confirm('Supprimer cette tâche ?');" class="m-0">
                                         <input type="hidden" name="task_id" value="<?= $task['task_id'] ?>">
-                                        <button type="submit" name="delete_task" class="btn btn-outline-danger btn-sm border-0">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-trash" viewBox="0 0 16 16">
+                                        <button type="submit" name="delete_task" class="btn btn-outline-danger btn-sm border-0 px-2 py-1">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" class="bi bi-trash" viewBox="0 0 16 16">
                                                 <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z" />
                                                 <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4z" />
                                             </svg>
@@ -613,11 +632,18 @@ $members = $stmtMembers->fetchAll(PDO::FETCH_ASSOC);
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content shadow border-0">
                 <div class="modal-header border-bottom-0 pb-0">
-                    <h5 class="modal-title fw-bold">Inviter un collaborateur</h5><button class="btn-close" data-bs-dismiss="modal"></button>
+                    <h5 class="modal-title fw-bold">Inviter un collaborateur</h5>
+                    <button class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <form method="POST">
-                    <div class="modal-body pt-4"><label class="form-label fw-semibold small text-muted">EMAIL</label><input type="email" name="email" class="form-control mb-3" placeholder="exemple@mail.com" required></div>
-                    <div class="modal-footer border-top-0 pt-0 pb-4"><button class="btn btn-link text-decoration-none text-muted" data-bs-dismiss="modal">Annuler</button><button type="submit" name="add_member" class="btn btn-dark px-4">Envoyer l'invitation</button></div>
+                    <div class="modal-body pt-4">
+                        <label class="form-label fw-semibold small text-muted">EMAIL</label>
+                        <input type="email" name="email" class="form-control mb-3" placeholder="exemple@mail.com" required>
+                    </div>
+                    <div class="modal-footer border-top-0 pt-0 pb-4">
+                        <button class="btn btn-link text-decoration-none text-muted" data-bs-dismiss="modal">Annuler</button>
+                        <button type="submit" name="add_member" class="btn btn-dark px-4">Envoyer l'invitation</button>
+                    </div>
                 </form>
             </div>
         </div>
@@ -625,6 +651,7 @@ $members = $stmtMembers->fetchAll(PDO::FETCH_ASSOC);
 
     <?php include 'footer.php'; ?>
 
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         document.getElementById('showCreateTask').onclick = () => new bootstrap.Modal('#createTaskModal').show();
         const addMemberBtn = document.getElementById('showAddMember');

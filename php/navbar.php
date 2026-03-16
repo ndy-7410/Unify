@@ -202,7 +202,7 @@ if (isset($_GET['ajax_notif'])) {
                 </li>
             </ul>
 
-            <ul class="navbar-nav align-items-center gap-3">
+            <ul class="navbar-nav flex-row flex-wrap flex-lg-nowrap align-items-center gap-3 mt-3 mt-lg-0">
                 <?php if (isset($_SESSION["user_id"])) { ?>
 
                     <li class="nav-item dropdown">
@@ -216,7 +216,7 @@ if (isset($_GET['ajax_notif'])) {
                             </span>
                         </a>
                         
-                        <ul id="notification-list" class="dropdown-menu dropdown-menu-end shadow-sm border-0 mt-2 overflow-y-auto" style="width: 320px; max-height: 400px;">
+                        <ul id="notification-list" class="dropdown-menu dropdown-menu-end shadow-sm border-0 mt-2 overflow-y-auto" style="max-width: 100vw; max-height: 400px;">
                             <?= renderNotificationsHTML($pendingInvites, $ownerNotifications, $totalNotifs) ?>
                         </ul>
                     </li>
@@ -238,11 +238,11 @@ if (isset($_GET['ajax_notif'])) {
                     </li>
 
                 <?php } else { ?>
-                    <li class="nav-item">
+                    <li class="nav-item w-100 w-lg-auto text-center">
                         <a class="nav-link fw-medium text-dark" href="login.php">Se connecter</a>
                     </li>
-                    <li class="nav-item">
-                        <a class="btn btn-dark rounded-pill px-4 ms-2" href="register.php">S'inscrire</a>
+                    <li class="nav-item w-100 w-lg-auto text-center mt-2 mt-lg-0">
+                        <a class="btn btn-dark rounded-pill px-4" href="register.php">S'inscrire</a>
                     </li>
                 <?php } ?>
             </ul>
@@ -255,7 +255,6 @@ if (isset($_GET['ajax_notif'])) {
 <script>
 document.addEventListener("DOMContentLoaded", function() {
     <?php if (isset($_SESSION["user_id"])): ?>
-    // Vérifie les notifications toutes les 5 secondes
     setInterval(function() {
         fetch('navbar.php?ajax_notif=1')
         .then(response => response.json())
@@ -279,4 +278,51 @@ document.addEventListener("DOMContentLoaded", function() {
     }, 5000);
     <?php endif; ?>
 });
+
+document.addEventListener("DOMContentLoaded", function() {
+    
+    // --- 1. FERMETURE DU MENU AU CLIC À L'EXTÉRIEUR ---
+    document.addEventListener('click', function (event) {
+        const navbarCollapse = document.getElementById('navbarNav');
+        const navbarToggler = document.querySelector('.navbar-toggler');
+
+        // On vérifie si le menu est actuellement ouvert (il a la classe 'show')
+        if (navbarCollapse && navbarCollapse.classList.contains('show')) {
+            // Si le clic n'est NI sur le menu, NI sur le bouton des 3 barres
+            if (!navbarCollapse.contains(event.target) && !navbarToggler.contains(event.target)) {
+                // On utilise la fonction native de Bootstrap pour fermer le menu
+                const bsCollapse = bootstrap.Collapse.getInstance(navbarCollapse);
+                if (bsCollapse) {
+                    bsCollapse.hide();
+                }
+            }
+        }
+    });
+
+    // --- 2. GESTION DES NOTIFICATIONS ---
+    <?php if (isset($_SESSION["user_id"])): ?>
+    setInterval(function() {
+        fetch('navbar.php?ajax_notif=1')
+        .then(response => response.json())
+        .then(data => {
+            const list = document.getElementById('notification-list');
+            if (list) {
+                list.innerHTML = data.html;
+            }
+            
+            const badge = document.getElementById('notif-badge');
+            if (badge) {
+                if (data.count > 0) {
+                    badge.classList.remove('d-none');
+                    badge.innerHTML = data.count + '<span class="visually-hidden">Alertes</span>';
+                } else {
+                    badge.classList.add('d-none');
+                }
+            }
+        })
+        .catch(err => console.error("Erreur actualisation notifs:", err));
+    }, 5000);
+    <?php endif; ?>
+});
+
 </script>

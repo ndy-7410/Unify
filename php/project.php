@@ -10,19 +10,38 @@ if (!isset($_SESSION["user_id"])) {
 
 $user_id = $_SESSION["user_id"];
 
-// Création d'un nouveau projet
+// Création d'un nouveau projet (AVEC VÉRIFICATION DU FORFAIT)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_project'])) {
     $name = trim($_POST['name'] ?? '');
     $description = trim($_POST['description'] ?? '');
-    // Récupération de la deadline, null si vide
     $deadline = !empty($_POST['deadline']) ? $_POST['deadline'] : null;
 
     if ($name !== '') {
-        $stmt = $pdo->prepare("INSERT INTO project (user_id, name, description, deadline, created_at, updated_at)
-                               VALUES (?, ?, ?, ?, NOW(), NOW())");
-        $stmt->execute([$user_id, $name, $description, $deadline]);
-        header("Location: project.php");
-        exit();
+        // 1. On récupère le forfait de l'utilisateur
+        $stmtPlan = $pdo->prepare("SELECT plan FROM user WHERE user_id = ?");
+        $stmtPlan->execute([$user_id]);
+        $userPlan = $stmtPlan->fetchColumn() ?: 'starter';
+
+        // 2. On compte combien de projets (dont il est propriétaire) il possède déjà
+        $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM project WHERE user_id = ?");
+        $stmtCount->execute([$user_id]);
+        $projectCount = $stmtCount->fetchColumn();
+
+        // 3. On définit la limite selon le forfait
+        $maxProjects = 3; // Starter
+        if ($userPlan === 'pro') $maxProjects = 5;
+        if ($userPlan === 'business') $maxProjects = 999999;
+
+        // 4. On vérifie s'il a le droit
+        if ($projectCount >= $maxProjects) {
+            $error = "Limite atteinte. Votre forfait " . ucfirst($userPlan) . " vous limite à $maxProjects projets. Veuillez améliorer votre abonnement dans l'onglet Prix.";
+        } else {
+            $stmt = $pdo->prepare("INSERT INTO project (user_id, name, description, deadline, created_at, updated_at)
+                                   VALUES (?, ?, ?, ?, NOW(), NOW())");
+            $stmt->execute([$user_id, $name, $description, $deadline]);
+            header("Location: project.php");
+            exit();
+        }
     } else {
         $error = "Le nom du projet est obligatoire.";
     }
@@ -33,10 +52,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_project'])) {
     $project_id = $_POST['project_id'] ?? '';
     $name = trim($_POST['name'] ?? '');
     $description = trim($_POST['description'] ?? '');
-    // Récupération de la deadline, null si vide
     $deadline = !empty($_POST['deadline']) ? $_POST['deadline'] : null;
 
-    // Sécurité : On vérifie que c'est bien le PROPRIÉTAIRE (user_id) qui modifie
     if ($name !== '' && $project_id !== '') {
         $stmt = $pdo->prepare("UPDATE project
                                SET name = ?, description = ?, deadline = ?, updated_at = NOW()
@@ -53,7 +70,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_project'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_project'])) {
     $project_id = $_POST['project_id'] ?? '';
     if ($project_id !== '') {
-        // Sécurité : Seul le propriétaire peut supprimer
         $stmt = $pdo->prepare("DELETE FROM project WHERE project_id = ? AND user_id = ?");
         $stmt->execute([$project_id, $user_id]);
         header("Location: project.php");
@@ -62,7 +78,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_project'])) {
 }
 
 // --- RECUPERATION DES PROJETS ---
-// Ajout de p.deadline dans le SELECT
 $sql = "SELECT DISTINCT p.project_id, p.name, p.description, p.deadline, p.created_at, p.updated_at, p.user_id as owner_id, u.name as owner_name
         FROM project p
         LEFT JOIN project_user pu ON p.project_id = pu.project_id
@@ -80,20 +95,21 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Unify | Mes Projets</title>
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
     <style>
-        /* Design des cartes harmonisé avec price.php */
         .card-project {
             transition: transform 0.3s ease, box-shadow 0.3s ease;
             background-color: #fff;
-            border: 1px solid rgba(0,0,0,.08);
+            border: 1px solid rgba(0, 0, 0, .08);
         }
+
         .card-project:hover {
             transform: translateY(-5px);
-            box-shadow: 0 .5rem 1rem rgba(0,0,0,.1)!important;
+            box-shadow: 0 .5rem 1rem rgba(0, 0, 0, .1) !important;
         }
     </style>
 </head>
@@ -102,14 +118,14 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     <?php include 'navbar.php'; ?>
 
-    <section class="py-5 text-center container mb-4">
+    <section class="py-5 text-center container mb-4 px-3">
         <div class="row py-lg-3">
             <div class="col-lg-6 col-md-8 mx-auto">
                 <h1 class="fw-bold mb-3">Mes Projets</h1>
                 <p class="text-muted mb-4">Gérez vos espaces de travail et collaborez avec votre équipe.</p>
                 <button class="btn btn-dark px-4 py-2" id="showFormBtn">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-plus-lg me-2" viewBox="0 0 16 16">
-                        <path fill-rule="evenodd" d="M8 2a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 2"/>
+                        <path fill-rule="evenodd" d="M8 2a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 2" />
                     </svg>
                     Nouveau projet
                 </button>
@@ -117,41 +133,47 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
         </div>
     </section>
 
-    <div class="album pb-5 bg-white flex-grow-1">
+    <div class="album pb-5 bg-white flex-grow-1 px-3 px-md-0">
         <div class="container">
-            
+
+            <?php if (!empty($error)): ?>
+                <div class="alert alert-danger text-center mx-auto mb-4" style="max-width: 600px;">
+                    <strong>Action bloquée :</strong> <?= htmlspecialchars($error) ?>
+                </div>
+            <?php endif; ?>
+
             <?php if (empty($projects)): ?>
                 <div class="text-center py-5">
                     <div class="mb-4 text-muted" style="opacity: 0.15;">
                         <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" fill="currentColor" class="bi bi-folder-plus" viewBox="0 0 16 16">
-                            <path d="m.5 3 .04.87a2 2 0 0 0-.342 1.311l.637 7A2 2 0 0 0 2.826 14H9v-1H2.826a1 1 0 0 1-.995-.91l-.637-7A1 1 0 0 1 2.19 4h11.62a1 1 0 0 1 .996 1.09L14.54 8h1.005l.256-2.819A2 2 0 0 0 13.81 3H9.828a2 2 0 0 1-1.414-.586l-.828-.828A2 2 0 0 0 6.172 1H2.5a2 2 0 0 0-2 2m5.672-1a1 1 0 0 1 .707.293L7.586 3H2.19c-.24 0-.47.042-.683.12L1.5 2.98a1 1 0 0 1 1-1z"/>
-                            <path d="M13.5 9a.5.5 0 0 1 .5.5V11h1.5a.5.5 0 0 1 0 1H14v1.5a.5.5 0 0 1-1 0V12h-1.5a.5.5 0 0 1 0-1H13V9.5a.5.5 0 0 1 .5-.5"/>
+                            <path d="m.5 3 .04.87a2 2 0 0 0-.342 1.311l.637 7A2 2 0 0 0 2.826 14H9v-1H2.826a1 1 0 0 1-.995-.91l-.637-7A1 1 0 0 1 2.19 4h11.62a1 1 0 0 1 .996 1.09L14.54 8h1.005l.256-2.819A2 2 0 0 0 13.81 3H9.828a2 2 0 0 1-1.414-.586l-.828-.828A2 2 0 0 0 6.172 1H2.5a2 2 0 0 0-2 2m5.672-1a1 1 0 0 1 .707.293L7.586 3H2.19c-.24 0-.47.042-.683.12L1.5 2.98a1 1 0 0 1 1-1z" />
+                            <path d="M13.5 9a.5.5 0 0 1 .5.5V11h1.5a.5.5 0 0 1 0 1H14v1.5a.5.5 0 0 1-1 0V12h-1.5a.5.5 0 0 1 0-1H13V9.5a.5.5 0 0 1 .5-.5" />
                         </svg>
                     </div>
                     <h4 class="text-muted fw-normal">Aucun projet pour le moment</h4>
                     <p class="text-secondary small">Commencez par créer votre premier espace de travail.</p>
                 </div>
             <?php else: ?>
-                
+
                 <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
-                    <?php foreach ($projects as $p): 
+                    <?php foreach ($projects as $p):
                         $is_owner = ($p['owner_id'] == $user_id);
                     ?>
                         <div class="col">
                             <div class="card card-project h-100 shadow-sm rounded-4 border-0">
                                 <div class="card-body d-flex flex-column p-4">
 
-                                    <div class="d-flex justify-content-between align-items-start mb-3">
-                                        <h5 class="card-title fw-bold text-truncate mb-0" style="max-width: 70%;" title="<?= htmlspecialchars($p['name']) ?>">
+                                    <div class="d-flex justify-content-between align-items-start mb-3 gap-2">
+                                        <h5 class="card-title fw-bold text-truncate flex-grow-1" title="<?= htmlspecialchars($p['name']) ?>">
                                             <?= htmlspecialchars($p['name']) ?>
                                         </h5>
-                                        <?php if($is_owner): ?>
-                                            <span class="badge bg-dark text-white rounded-pill px-3">Propriétaire</span>
+                                        <?php if ($is_owner): ?>
+                                            <span class="badge bg-dark text-white rounded-pill px-2 px-sm-3 flex-shrink-0">Propriétaire</span>
                                         <?php else: ?>
-                                            <span class="badge bg-light text-dark border rounded-pill px-3">Partagé</span>
+                                            <span class="badge bg-light text-dark border rounded-pill px-2 px-sm-3 flex-shrink-0">Partagé</span>
                                         <?php endif; ?>
                                     </div>
-                                    
+
                                     <p class="card-text text-muted small flex-grow-1 mb-2">
                                         <?= !empty($p['description']) ? htmlspecialchars($p['description']) : '<em>Aucune description</em>' ?>
                                     </p>
@@ -160,8 +182,8 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                         <div class="mb-3">
                                             <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-2 py-1">
                                                 <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" class="bi bi-clock me-1 mb-1" viewBox="0 0 16 16">
-                                                    <path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71V3.5z"/>
-                                                    <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0z"/>
+                                                    <path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71V3.5z" />
+                                                    <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0z" />
                                                 </svg>
                                                 Échéance : <?= date("d/m/Y", strtotime($p['deadline'])) ?>
                                             </span>
@@ -170,38 +192,37 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
                                     <div class="mt-auto pt-3 border-top">
                                         <div class="d-flex justify-content-between align-items-center mb-3">
-                                            <small class="text-secondary d-flex align-items-center">
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" class="bi bi-person-circle me-1" viewBox="0 0 16 16">
-                                                    <path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0"/>
-                                                    <path fill-rule="evenodd" d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8m8-7a7 7 0 0 0-5.468 11.37C3.242 11.226 4.805 10 8 10s4.757 1.225 5.468 2.37A7 7 0 0 0 8 1"/>
+                                            <small class="text-secondary d-flex align-items-center text-truncate pe-2">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" class="bi bi-person-circle me-1 flex-shrink-0" viewBox="0 0 16 16">
+                                                    <path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0" />
+                                                    <path fill-rule="evenodd" d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8m8-7a7 7 0 0 0-5.468 11.37C3.242 11.226 4.805 10 8 10s4.757 1.225 5.468 2.37A7 7 0 0 0 8 1" />
                                                 </svg>
-                                                <?= htmlspecialchars($p['owner_name']) ?>
+                                                <span class="text-truncate"><?= htmlspecialchars($p['owner_name']) ?></span>
                                             </small>
-                                            <small class="text-muted" style="font-size: 0.75rem;">
+                                            <small class="text-muted flex-shrink-0" style="font-size: 0.75rem;">
                                                 <?= date("d/m/Y", strtotime($p['created_at'])) ?>
                                             </small>
                                         </div>
 
-                                        <div class="d-grid gap-2 d-flex">
-                                            <a href="task.php?project_id=<?= $p['project_id'] ?>" class="btn btn-dark btn-sm flex-grow-1">
+                                        <div class="d-flex gap-2">
+                                            <a href="task.php?project_id=<?= $p['project_id'] ?>" class="btn btn-dark btn-sm flex-grow-1 py-2">
                                                 Accéder
                                             </a>
 
-                                            <?php if($is_owner): ?>
-                                                <button class="btn btn-outline-secondary btn-sm editBtn"
+                                            <?php if ($is_owner): ?>
+                                                <button class="btn btn-outline-secondary btn-sm editBtn px-3"
                                                     data-id="<?= $p['project_id'] ?>"
                                                     data-name="<?= htmlspecialchars($p['name'], ENT_QUOTES) ?>"
                                                     data-description="<?= htmlspecialchars($p['description'], ENT_QUOTES) ?>"
                                                     data-deadline="<?= htmlspecialchars($p['deadline'] ?? '', ENT_QUOTES) ?>"
                                                     title="Paramètres">
                                                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-gear-fill" viewBox="0 0 16 16">
-                                                        <path d="M9.405 1.05c-.413-1.4-2.397-1.4-2.81 0l-.1.34a1.464 1.464 0 0 1-2.105.872l-.31-.17c-1.283-.698-2.686.705-1.987 1.987l.169.311c.446.82.023 1.841-.872 2.105l-.34.1c-1.4.413-1.4 2.397 0 2.81l.34.1a1.464 1.464 0 0 1 .872 2.105l-.17.31c-.698 1.283.705 2.686 1.987 1.987l.311-.169a1.464 1.464 0 0 1 2.105.872l.1.34c.413 1.4 2.397 1.4 2.81 0l.1-.34a1.464 1.464 0 0 1 2.105-.872l.31.17c1.283.698 2.686-.705 1.987-1.987l-.169-.311a1.464 1.464 0 0 1 .872-2.105l.34-.1c1.4-.413 1.4-2.397 0-2.81l-.34-.1a1.464 1.464 0 0 1-.872-2.105l.17-.31c.698-1.283-.705-2.686-1.987-1.987l-.311.169a1.464 1.464 0 0 1-2.105-.872zM8 10.93a2.929 2.929 0 1 1 0-5.86 2.929 2.929 0 0 1 0 5.86"/>
+                                                        <path d="M9.405 1.05c-.413-1.4-2.397-1.4-2.81 0l-.1.34a1.464 1.464 0 0 1-2.105.872l-.31-.17c-1.283-.698-2.686.705-1.987 1.987l.169.311c.446.82.023 1.841-.872 2.105l-.34.1c-1.4.413-1.4 2.397 0 2.81l.34.1a1.464 1.464 0 0 1 .872 2.105l-.17.31c-.698 1.283.705 2.686 1.987 1.987l.311-.169a1.464 1.464 0 0 1 2.105.872l.1.34c.413 1.4 2.397 1.4 2.81 0l.1-.34a1.464 1.464 0 0 1 2.105-.872l.31.17c1.283.698 2.686-.705 1.987-1.987l-.169-.311a1.464 1.464 0 0 1 .872-2.105l.34-.1c1.4-.413 1.4-2.397 0-2.81l-.34-.1a1.464 1.464 0 0 1-.872-2.105l.17-.31c.698-1.283-.705-2.686-1.987-1.987l-.311.169a1.464 1.464 0 0 1-2.105-.872zM8 10.93a2.929 2.929 0 1 1 0-5.86 2.929 2.929 0 0 1 0 5.86" />
                                                     </svg>
                                                 </button>
                                             <?php endif; ?>
                                         </div>
                                     </div>
-
                                 </div>
                             </div>
                         </div>
@@ -214,7 +235,7 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 
     <div class="modal fade" id="createProjectModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down">
             <div class="modal-content border-0 shadow">
 
                 <div class="modal-header border-bottom-0">
@@ -232,14 +253,10 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
                         <label class="form-label fw-semibold">Date limite / Échéance (Optionnel)</label>
                         <input type="date" name="deadline" class="form-control">
-
-                        <?php if (!empty($error)): ?>
-                            <div class="alert alert-danger mt-3 py-2 small"><?= htmlspecialchars($error) ?></div>
-                        <?php endif; ?>
                     </div>
-                    <div class="modal-footer border-top-0">
-                        <button type="button" class="btn btn-link text-secondary text-decoration-none" data-bs-dismiss="modal">Annuler</button>
-                        <button type="submit" name="create_project" class="btn btn-dark">Créer le projet</button>
+                    <div class="modal-footer border-top-0 d-flex flex-column flex-sm-row gap-2 w-100">
+                        <button type="button" class="btn btn-light text-secondary text-decoration-none w-100 order-2 order-sm-1" data-bs-dismiss="modal">Annuler</button>
+                        <button type="submit" name="create_project" class="btn btn-dark w-100 order-1 order-sm-2">Créer le projet</button>
                     </div>
                 </form>
 
@@ -248,7 +265,7 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
     </div>
 
     <div class="modal fade" id="editProjectModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down">
             <div class="modal-content border-0 shadow">
 
                 <div class="modal-header border-bottom-0">
@@ -273,12 +290,12 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             <div class="alert alert-danger mt-3 py-2 small"><?= htmlspecialchars($update_error) ?></div>
                         <?php endif; ?>
                     </div>
-                    <div class="modal-footer border-top-0 d-flex justify-content-between">
-                        <button type="submit" name="delete_project" class="btn btn-outline-danger btn-sm"
+                    <div class="modal-footer border-top-0 d-flex flex-column flex-sm-row justify-content-between gap-2 w-100">
+                        <button type="submit" name="delete_project" class="btn btn-outline-danger w-100 order-2 order-sm-1"
                             onclick="return confirm('Attention : Cette action est irréversible. Tout le contenu du projet sera supprimé. Continuer ?')">
                             Supprimer le projet
                         </button>
-                        <button type="submit" name="update_project" class="btn btn-dark">Enregistrer</button>
+                        <button type="submit" name="update_project" class="btn btn-dark w-100 order-1 order-sm-2">Enregistrer</button>
                     </div>
                 </form>
 
@@ -291,18 +308,16 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
     </div>
 
     <script>
-        // OUVERTURE MODAL AJOUT
         document.getElementById('showFormBtn').addEventListener('click', function() {
             new bootstrap.Modal(document.getElementById('createProjectModal')).show();
         });
 
-        // OUVERTURE MODAL EDITION (Récupération de la deadline en JavaScript)
         document.querySelectorAll('.editBtn').forEach(function(btn) {
             btn.addEventListener('click', function() {
                 document.getElementById('edit_project_id').value = btn.dataset.id;
                 document.getElementById('edit_name').value = btn.dataset.name;
                 document.getElementById('edit_description').value = btn.dataset.description;
-                document.getElementById('edit_deadline').value = btn.dataset.deadline; // Charge la date
+                document.getElementById('edit_deadline').value = btn.dataset.deadline;
                 new bootstrap.Modal(document.getElementById('editProjectModal')).show();
             });
         });
