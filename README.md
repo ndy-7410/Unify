@@ -18,9 +18,9 @@ Unify est une application web SaaS (Software as a Service) qui permet aux utilis
     * Tri dynamique des tâches par statut, priorité ou échéance.
 * **🤝 Collaboration en Temps Réel :** * Invitation de collaborateurs par adresse email.
     * Système de notifications dynamique intégré à la barre de navigation (AJAX Polling) pour accepter/refuser les invitations.
-* **💳 Système d'Abonnement (Monétisation) :** * Intégration d'un système de forfaits (Starter, Pro, Business).
+* **💳 Système d'Abonnement (Monétisation) :** * Intégration d'un système de forfaits (Starter, Pro, Business) avec possibilité de rétrograder.
     * Restrictions côté serveur basées sur le forfait (limites de création de projets et de collaborateurs).
-    * Intégration de l'API **Lemon Squeezy** via Webhooks pour gérer et valider les paiements.
+    * Intégration de l'API **Stripe** et d'un simulateur de paiement interne personnalisé pour gérer et valider les paiements lors de la soutenance.
 
 ## 🛠️ Technologies Utilisées
 
@@ -29,7 +29,7 @@ Ce projet est construit avec des technologies web standards et ne nécessite auc
 * **Frontend :** HTML5, CSS3, JavaScript (Vanilla ES6), framework **Bootstrap 5.3.8** pour un design responsive et moderne.
 * **Backend :** PHP 8+ (Système de sessions, architecture procédurale).
 * **Base de données :** MySQL (Communication sécurisée via l'extension PHP PDO).
-* **Paiement :** API Lemon Squeezy.
+* **Paiement :** API Stripe / Simulateur PHP local.
 
 ## 🧑‍💻 Auteur
 
